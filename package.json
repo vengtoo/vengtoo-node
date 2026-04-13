@@ -1,0 +1,29 @@
+{
+  "name": "@authzx/sdk",
+  "version": "0.1.0",
+  "description": "AuthzX Node.js SDK — authorization client for AuthzX cloud and local agent",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "authorization",
+    "authzx",
+    "opa",
+    "rbac",
+    "abac"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.4.0"
+  }
+}
