@@ -26,6 +26,28 @@ const allowed = await authzx.check(
 )
 ```
 
+### OAuth2 Client Credentials
+
+For service-to-service auth, pass `clientId` + `clientSecret` (secret is prefixed `azx_cs_`). The SDK exchanges credentials at the token endpoint, caches the JWT in memory, and refreshes ~60s before expiry.
+
+```typescript
+const authzx = new AuthzX({
+  clientId: 'my-client-id',
+  clientSecret: 'azx_cs_...',
+})
+```
+
+Equivalent curl for the underlying token exchange:
+
+```bash
+curl -X POST https://api.authzx.com/identity-srv/v1/oauth/token \
+  -d grant_type=client_credentials \
+  -d client_id=my-client-id \
+  -d client_secret=azx_cs_...
+```
+
+Providing both `apiKey` and OAuth credentials is rejected at construction. A bad `clientId` / `clientSecret` surfaces as an `AuthzXOAuthError` (distinct from `AuthzXError`) with a message pointing you at the OAuth exchange.
+
 ### Agent Mode (local)
 
 ```typescript

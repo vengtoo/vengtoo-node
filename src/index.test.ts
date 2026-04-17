@@ -1,4 +1,4 @@
-import { AuthzX, AuthzXError } from "./index";
+import { AuthzX, AuthzXError, AuthzXOAuthError } from "./index";
 import { createServer, IncomingMessage, ServerResponse } from "http";
 
 function mockServer(
@@ -145,6 +145,235 @@ async function main() {
       assert(attempts === 3, `expected 3 attempts, got ${attempts}`);
     } finally {
       srv.close();
+    }
+  });
+
+  // --- OAuth2 Client Credentials ---
+
+  function collectForm(req: IncomingMessage): Promise<URLSearchParams> {
+    return new Promise((resolve) => {
+      let data = "";
+      req.on("data", (chunk: string) => (data += chunk));
+      req.on("end", () => resolve(new URLSearchParams(data)));
+    });
+  }
+
+  await test("oauth: token exchange happy path", async () => {
+    let tokenCalls = 0;
+    let apiCalls = 0;
+    let gotAuthHeader = "";
+    const srv = await mockServer(async (req, res) => {
+      if (req.url === "/oauth/token") {
+        tokenCalls++;
+        const form = await collectForm(req);
+        assert(
+          req.headers["content-type"] === "application/x-www-form-urlencoded",
+          "bad token content-type"
+        );
+        assert(form.get("grant_type") === "client_credentials", "bad grant_type");
+        assert(form.get("client_id") === "cid", "bad client_id");
+        assert(form.get("client_secret") === "azx_cs_secret", "bad client_secret");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            access_token: "jwt.token.here",
+            token_type: "Bearer",
+            expires_in: 3600,
+          })
+        );
+        return;
+      }
+      apiCalls++;
+      gotAuthHeader = req.headers["authorization"] as string;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+    });
+    try {
+      const client = new AuthzX({
+        clientId: "cid",
+        clientSecret: "azx_cs_secret",
+        baseUrl: srv.url,
+        tokenUrl: `${srv.url}/oauth/token`,
+      });
+      const allowed = await client.check({ id: "u-1" }, "read", { id: "d-1" });
+      assert(allowed === true, "expected allowed");
+      assert(tokenCalls === 1, `expected 1 token call, got ${tokenCalls}`);
+      assert(apiCalls === 1, `expected 1 API call, got ${apiCalls}`);
+      assert(
+        gotAuthHeader === "Bearer jwt.token.here",
+        `bad auth header: ${gotAuthHeader}`
+      );
+    } finally {
+      srv.close();
+    }
+  });
+
+  await test("oauth: invalid_client surfaces clear error", async () => {
+    const srv = await mockServer((req, res) => {
+      if (req.url === "/oauth/token") {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid_client" }));
+        return;
+      }
+      res.writeHead(500);
+      res.end("API should not be called");
+    });
+    try {
+      const client = new AuthzX({
+        clientId: "cid",
+        clientSecret: "azx_cs_wrong",
+        baseUrl: srv.url,
+        tokenUrl: `${srv.url}/oauth/token`,
+      });
+      try {
+        await client.check({ id: "u-1" }, "read", { id: "d-1" });
+        assert(false, "should have thrown");
+      } catch (e: any) {
+        assert(
+          e instanceof AuthzXOAuthError,
+          `expected AuthzXOAuthError, got ${e?.constructor?.name}`
+        );
+        assert(
+          e.message.includes("check client_id/client_secret"),
+          `bad message: ${e.message}`
+        );
+      }
+    } finally {
+      srv.close();
+    }
+  });
+
+  await test("oauth: cached token reused across calls", async () => {
+    let tokenCalls = 0;
+    let apiCalls = 0;
+    const srv = await mockServer((req, res) => {
+      if (req.url === "/oauth/token") {
+        tokenCalls++;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            access_token: "tok-abc",
+            token_type: "Bearer",
+            expires_in: 3600,
+          })
+        );
+        return;
+      }
+      apiCalls++;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+    });
+    try {
+      const client = new AuthzX({
+        clientId: "cid",
+        clientSecret: "azx_cs_secret",
+        baseUrl: srv.url,
+        tokenUrl: `${srv.url}/oauth/token`,
+      });
+      await client.check({ id: "u-1" }, "read", { id: "d-1" });
+      await client.check({ id: "u-1" }, "read", { id: "d-1" });
+      await client.check({ id: "u-1" }, "read", { id: "d-1" });
+      assert(tokenCalls === 1, `expected 1 token call, got ${tokenCalls}`);
+      assert(apiCalls === 3, `expected 3 API calls, got ${apiCalls}`);
+    } finally {
+      srv.close();
+    }
+  });
+
+  await test("oauth: 401 on API triggers refresh+retry", async () => {
+    let tokenCalls = 0;
+    let apiCalls = 0;
+    const srv = await mockServer((req, res) => {
+      if (req.url === "/oauth/token") {
+        tokenCalls++;
+        const tok = tokenCalls === 1 ? "tok-stale" : "tok-fresh";
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            access_token: tok,
+            token_type: "Bearer",
+            expires_in: 3600,
+          })
+        );
+        return;
+      }
+      apiCalls++;
+      const auth = req.headers["authorization"];
+      if (auth === "Bearer tok-stale") {
+        res.writeHead(401);
+        res.end("stale token");
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+    });
+    try {
+      const client = new AuthzX({
+        clientId: "cid",
+        clientSecret: "azx_cs_secret",
+        baseUrl: srv.url,
+        tokenUrl: `${srv.url}/oauth/token`,
+      });
+      const allowed = await client.check({ id: "u-1" }, "read", { id: "d-1" });
+      assert(allowed === true, "expected allowed after refresh+retry");
+      assert(tokenCalls === 2, `expected 2 token calls, got ${tokenCalls}`);
+      assert(apiCalls === 2, `expected 2 API calls, got ${apiCalls}`);
+    } finally {
+      srv.close();
+    }
+  });
+
+  await test("oauth: 401 retry only once (no loop)", async () => {
+    let apiCalls = 0;
+    const srv = await mockServer((req, res) => {
+      if (req.url === "/oauth/token") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            access_token: "tok",
+            token_type: "Bearer",
+            expires_in: 3600,
+          })
+        );
+        return;
+      }
+      apiCalls++;
+      res.writeHead(401);
+      res.end("nope");
+    });
+    try {
+      const client = new AuthzX({
+        clientId: "cid",
+        clientSecret: "azx_cs_secret",
+        baseUrl: srv.url,
+        tokenUrl: `${srv.url}/oauth/token`,
+      });
+      try {
+        await client.check({ id: "u-1" }, "read", { id: "d-1" });
+        assert(false, "should have thrown");
+      } catch (e: any) {
+        assert(e instanceof AuthzXError, `expected AuthzXError, got ${e?.constructor?.name}`);
+        assert(e.statusCode === 401, `expected 401, got ${e.statusCode}`);
+      }
+      assert(apiCalls === 2, `expected 2 API calls, got ${apiCalls}`);
+    } finally {
+      srv.close();
+    }
+  });
+
+  await test("oauth: apiKey + OAuth is construction error", async () => {
+    try {
+      new AuthzX({
+        apiKey: "azx_key",
+        clientId: "cid",
+        clientSecret: "azx_cs_secret",
+      });
+      assert(false, "should have thrown");
+    } catch (e: any) {
+      assert(
+        e.message.includes("either apiKey or OAuth"),
+        `bad message: ${e.message}`
+      );
     }
   });
 
