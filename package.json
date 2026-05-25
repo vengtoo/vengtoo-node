@@ -1,6 +1,6 @@
 {
   "name": "@authzx/sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "AuthzX Node.js SDK — authorization client for AuthzX Cloud and the AuthzX Agent",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -25,11 +25,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/authzx/node-sdk.git"
+    "url": "git+https://github.com/authzx/authzx-node.git"
   },
   "homepage": "https://authzx.com",
   "bugs": {
-    "url": "https://github.com/authzx/node-sdk/issues"
+    "url": "https://github.com/authzx/authzx-node/issues"
   },
   "engines": {
     "node": ">=18"
