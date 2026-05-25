@@ -13,9 +13,9 @@ async function main() {
   const resp = await authzx.authorize({
     subject: { id: "user-123" },
     resource: { id: "doc-456" },
-    action: "read",
+    action: { name: "read" },
   });
-  console.log(`Allowed=${resp.allowed} Reason="${resp.reason}" Path=${resp.access_path}`);
+  console.log(`Decision=${resp.decision} Reason="${resp.context?.reason}" Path=${resp.context?.access_path}`);
 }
 
 main().catch(console.error);

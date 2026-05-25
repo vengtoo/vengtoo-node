@@ -1,24 +1,36 @@
 {
   "name": "@authzx/sdk",
   "version": "0.2.0",
-  "description": "AuthzX Node.js SDK — authorization client for AuthzX cloud and local agent",
+  "description": "AuthzX Node.js SDK — authorization client for AuthzX Cloud and the AuthzX Agent",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.test.*"
   ],
   "scripts": {
     "build": "tsc",
+    "test": "node --experimental-strip-types src/index.test.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
     "authorization",
     "authzx",
-    "opa",
     "rbac",
-    "abac"
+    "abac",
+    "access-control",
+    "ai-agents"
   ],
+  "author": "AuthzX <hello@authzx.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/authzx/node-sdk.git"
+  },
+  "homepage": "https://authzx.com",
+  "bugs": {
+    "url": "https://github.com/authzx/node-sdk/issues"
+  },
   "engines": {
     "node": ">=18"
   },

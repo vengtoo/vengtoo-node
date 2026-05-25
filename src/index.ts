@@ -2,6 +2,7 @@ export interface Subject {
   id: string;
   type?: string;
   attributes?: Record<string, unknown>;
+  properties?: Record<string, unknown>;
   roles?: string[];
 }
 
@@ -9,20 +10,55 @@ export interface Resource {
   id: string;
   type?: string;
   attributes?: Record<string, unknown>;
+  properties?: Record<string, unknown>;
+}
+
+export interface Action {
+  name: string;
+  properties?: Record<string, unknown>;
 }
 
 export interface AuthorizeRequest {
   subject: Subject;
   resource: Resource;
-  action: string;
+  action: Action;
   context?: Record<string, unknown>;
 }
 
-export interface AuthorizeResponse {
-  allowed: boolean;
-  reason: string;
+export interface AuthorizeContext {
+  reason?: string;
+  reason_code?: string;
   policy_id?: string;
   access_path?: string;
+}
+
+export interface AuthorizeResponse {
+  decision: boolean;
+  context?: AuthorizeContext;
+}
+
+export interface BatchEvalItem {
+  subject?: Subject;
+  action?: Action;
+  resource?: Resource;
+  context?: Record<string, unknown>;
+}
+
+export interface BatchOptions {
+  evaluations_semantic?: string;
+}
+
+export interface BatchEvaluationRequest {
+  evaluations: BatchEvalItem[];
+  subject?: Subject;
+  action?: Action;
+  resource?: Resource;
+  context?: Record<string, unknown>;
+  options?: BatchOptions;
+}
+
+export interface BatchEvaluationResponse {
+  evaluations: AuthorizeResponse[];
 }
 
 export interface AuthzXOptions {
@@ -138,6 +174,14 @@ export class AuthzX {
     return this.baseUrl.endsWith("/v1")
       ? `${this.baseUrl}/authorize`
       : `${this.baseUrl}/v1/authorize`;
+  }
+
+  private get batchUrl(): string {
+    if (this.baseUrl.endsWith("/v1")) {
+      const base = this.baseUrl.slice(0, -3);
+      return `${base}/access/v1/evaluations`;
+    }
+    return `${this.baseUrl}/access/v1/evaluations`;
   }
 
   /** Fetches (or returns cached) OAuth access token. Thread-safe via promise guard. */
@@ -318,8 +362,77 @@ export class AuthzX {
     resource: Resource,
     context?: Record<string, unknown>
   ): Promise<boolean> {
-    const resp = await this.authorize({ subject, action, resource, context });
-    return resp.allowed;
+    const resp = await this.authorize({ subject, action: { name: action }, resource, context });
+    return resp.decision;
+  }
+
+  async authorizeBatch(req: BatchEvaluationRequest): Promise<BatchEvaluationResponse> {
+    if (!req.evaluations || req.evaluations.length === 0) {
+      throw new Error("authzx: batch request requires at least one evaluation");
+    }
+    if (req.evaluations.length > 50) {
+      throw new Error("authzx: batch request exceeds maximum of 50 evaluations");
+    }
+
+    let oauthRetried = false;
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, attempt * 100));
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const auth = await this.authHeader();
+      if (auth) headers["Authorization"] = auth;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      try {
+        const response = await fetch(this.batchUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(req),
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          return (await response.json()) as BatchEvaluationResponse;
+        }
+
+        const body = await response.text();
+
+        if (response.status === 401 && this.oauth && !oauthRetried) {
+          this.invalidateToken();
+          oauthRetried = true;
+          attempt--;
+          continue;
+        }
+
+        const err = new AuthzXError(response.status, body);
+        if (response.status >= 500 || response.status === 429) {
+          lastError = err;
+          continue;
+        }
+        throw err;
+      } catch (err) {
+        if (err instanceof AuthzXError) throw err;
+        if (err instanceof AuthzXOAuthError) throw err;
+        lastError = err as Error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    throw lastError;
+  }
+
+  async checkBatch(req: BatchEvaluationRequest): Promise<boolean[]> {
+    const resp = await this.authorizeBatch(req);
+    return resp.evaluations.map((e) => e.decision);
   }
 
   /**

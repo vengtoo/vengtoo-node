@@ -1,6 +1,6 @@
 # AuthzX Node SDK
 
-TypeScript/JavaScript client for [AuthzX](https://authzx.com) — works with both AuthzX Cloud and the local AuthzX Agent.
+TypeScript/JavaScript client for [AuthzX](https://authzx.com) — works with both AuthzX Cloud and the AuthzX Agent.
 
 Zero dependencies. Requires Node.js 18+ (uses native `fetch`).
 
@@ -59,11 +59,11 @@ const authzx = new AuthzX({ baseUrl: 'http://localhost:8181' })
 ```typescript
 const resp = await authzx.authorize({
   subject: { id: 'user:123', type: 'user' },
-  action: 'read',
+  action: { name: 'read' },
   resource: { type: 'document', id: 'doc:456' },
   context: { ip: '10.0.0.1' },
 })
-// resp.allowed, resp.reason, resp.policy_id, resp.access_path
+// resp.decision, resp.context?.reason, resp.context?.policy_id, resp.context?.access_path
 ```
 
 ### Express Middleware
@@ -98,28 +98,40 @@ new AuthzX({
 ```typescript
 interface Subject {
   id: string
-  type: string
+  type?: string
   attributes?: Record<string, unknown>
+  properties?: Record<string, unknown>
   roles?: string[]
 }
 
 interface Resource {
-  type: string
   id: string
+  type?: string
   attributes?: Record<string, unknown>
+  properties?: Record<string, unknown>
+}
+
+interface Action {
+  name: string
+  properties?: Record<string, unknown>
 }
 
 interface AuthorizeRequest {
   subject: Subject
   resource: Resource
-  action: string
+  action: Action
   context?: Record<string, unknown>
 }
 
-interface AuthorizeResponse {
-  allowed: boolean
-  reason: string
+interface AuthorizeContext {
+  reason?: string
+  reason_code?: string
   policy_id?: string
   access_path?: string
+}
+
+interface AuthorizeResponse {
+  decision: boolean
+  context?: AuthorizeContext
 }
 ```

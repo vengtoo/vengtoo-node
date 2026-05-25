@@ -44,7 +44,7 @@ async function main() {
   await test("check returns true when allowed", async () => {
     const srv = await mockServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "role_match" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "role_match" } }));
     });
     try {
       const client = new AuthzX({ apiKey: "test-key", baseUrl: srv.url });
@@ -58,7 +58,7 @@ async function main() {
   await test("check returns false when denied", async () => {
     const srv = await mockServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: false, reason: "no policy" }));
+      res.end(JSON.stringify({ decision: false, context: { reason: "no policy" } }));
     });
     try {
       const client = new AuthzX({ apiKey: "test-key", baseUrl: srv.url });
@@ -72,18 +72,18 @@ async function main() {
   await test("authorize returns full response", async () => {
     const srv = await mockServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "direct", policy_id: "pol-1", access_path: "direct" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "direct", policy_id: "pol-1", access_path: "direct" } }));
     });
     try {
       const client = new AuthzX({ apiKey: "test-key", baseUrl: srv.url });
       const resp = await client.authorize({
         subject: { id: "user-1" },
         resource: { id: "doc-1" },
-        action: "read",
+        action: { name: "read" },
       });
-      assert(resp.allowed === true, "expected allowed");
-      assert(resp.policy_id === "pol-1", "expected pol-1");
-      assert(resp.access_path === "direct", "expected direct");
+      assert(resp.decision === true, "expected decision=true");
+      assert(resp.context?.policy_id === "pol-1", "expected pol-1");
+      assert(resp.context?.access_path === "direct", "expected direct");
     } finally {
       srv.close();
     }
@@ -94,9 +94,9 @@ async function main() {
       const body = await collectBody(req);
       assert(req.headers["authorization"] === "Bearer my-key", "bad auth header");
       assert(body.subject.id === "user-1", "bad subject");
-      assert(body.action === "read", "bad action");
+      assert(body.action.name === "read", "bad action name");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "ok" } }));
     });
     try {
       const client = new AuthzX({ apiKey: "my-key", baseUrl: srv.url });
@@ -136,7 +136,7 @@ async function main() {
         return;
       }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "ok" } }));
     });
     try {
       const client = new AuthzX({ apiKey: "test", baseUrl: srv.url, maxRetries: 2 });
@@ -186,7 +186,7 @@ async function main() {
       apiCalls++;
       gotAuthHeader = req.headers["authorization"] as string;
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "ok" } }));
     });
     try {
       const client = new AuthzX({
@@ -261,7 +261,7 @@ async function main() {
       }
       apiCalls++;
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "ok" } }));
     });
     try {
       const client = new AuthzX({
@@ -305,7 +305,7 @@ async function main() {
         return;
       }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ allowed: true, reason: "ok" }));
+      res.end(JSON.stringify({ decision: true, context: { reason: "ok" } }));
     });
     try {
       const client = new AuthzX({
