@@ -120,7 +120,7 @@ export class AuthzXOAuthError extends Error {
 }
 
 const DEFAULT_TOKEN_URL =
-  "https://api.authzx.com/identity-srv/v1/oauth/token";
+  "https://api.authzx.com/v1/oauth/token";
 const REFRESH_SKEW_MS = 60_000;
 
 interface CachedToken {
@@ -171,16 +171,10 @@ export class AuthzX {
   }
 
   private get url(): string {
-    return this.baseUrl.endsWith("/v1")
-      ? `${this.baseUrl}/authorize`
-      : `${this.baseUrl}/v1/authorize`;
+    return `${this.baseUrl}/access/v1/evaluation`;
   }
 
   private get batchUrl(): string {
-    if (this.baseUrl.endsWith("/v1")) {
-      const base = this.baseUrl.slice(0, -3);
-      return `${base}/access/v1/evaluations`;
-    }
     return `${this.baseUrl}/access/v1/evaluations`;
   }
 

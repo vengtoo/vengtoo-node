@@ -1,6 +1,6 @@
 {
   "name": "@authzx/sdk",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "description": "AuthzX Node.js SDK — authorization client for AuthzX Cloud and the AuthzX Agent",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
