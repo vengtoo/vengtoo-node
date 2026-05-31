@@ -145,7 +145,7 @@ export class AuthzX {
 
   constructor(options: AuthzXOptions = {}) {
     this.apiKey = options.apiKey || "";
-    this.baseUrl = options.baseUrl || "https://api.authzx.com/v1";
+    this.baseUrl = options.baseUrl || "https://api.authzx.com";
     this.timeout = options.timeout || 10000;
     this.maxRetries = options.maxRetries ?? 2;
 
