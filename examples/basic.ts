@@ -1,7 +1,7 @@
-import { AuthzX } from "../src/index";
+import { Vengtoo } from "../src/index";
 
 async function main() {
-  const authzx = new AuthzX({ apiKey: "azx_your_api_key_here" });
+  const authzx = new Vengtoo({ apiKey: "azx_your_api_key_here" });
 
   const allowed = await authzx.check(
     { id: "user-123" },

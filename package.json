@@ -21,11 +21,11 @@
     "access-control",
     "ai-agents"
   ],
-  "author": "AuthzX <hello@vengtoo.com>",
+  "author": "Vengtoo <hello@vengtoo.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/authzx/vengtoo-node.git"
+    "url": "git+https://github.com/vengtoo/vengtoo-node.git"
   },
   "homepage": "https://vengtoo.com",
   "bugs": {

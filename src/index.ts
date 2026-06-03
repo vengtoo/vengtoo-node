@@ -61,26 +61,26 @@ export interface BatchEvaluationResponse {
   evaluations: AuthorizeResponse[];
 }
 
-export interface AuthzXOptions {
+export interface VengtooOptions {
   apiKey?: string;
   /** OAuth2 Client Credentials: client identifier. */
   clientId?: string;
   /** OAuth2 Client Credentials: client secret (azx_cs_...). */
   clientSecret?: string;
-  /** Override the OAuth2 token endpoint (defaults to AuthzX Cloud). */
+  /** Override the OAuth2 token endpoint (defaults to Vengtoo Cloud). */
   tokenUrl?: string;
   baseUrl?: string;
   timeout?: number;
   maxRetries?: number;
 }
 
-export class AuthzXError extends Error {
+export class VengtooError extends Error {
   constructor(
     public readonly statusCode: number,
     message: string
   ) {
     super(message);
-    this.name = "AuthzXError";
+    this.name = "VengtooError";
   }
 
   get isAuthError(): boolean {
@@ -99,10 +99,10 @@ export class AuthzXError extends Error {
 
 /**
  * Thrown when the OAuth2 Client Credentials token exchange fails. Distinct
- * from AuthzXError so customers debugging setup know the failure was the
+ * from VengtooError so customers debugging setup know the failure was the
  * OAuth exchange, not their authorize() call.
  */
-export class AuthzXOAuthError extends Error {
+export class VengtooOAuthError extends Error {
   constructor(
     public readonly statusCode: number,
     public readonly code: string,
@@ -115,7 +115,7 @@ export class AuthzXOAuthError extends Error {
           ? `OAuth token exchange failed (${code}): ${description}`
           : `OAuth token exchange failed (${code})`;
     super(msg);
-    this.name = "AuthzXOAuthError";
+    this.name = "VengtooOAuthError";
   }
 }
 
@@ -128,7 +128,7 @@ interface CachedToken {
   expiresAt: number; // epoch ms
 }
 
-export class AuthzX {
+export class Vengtoo {
   private apiKey: string;
   private baseUrl: string;
   private timeout: number;
@@ -143,7 +143,7 @@ export class AuthzX {
   /** In-flight token fetch promise — acts as a mutex across concurrent callers. */
   private tokenFetch?: Promise<string>;
 
-  constructor(options: AuthzXOptions = {}) {
+  constructor(options: VengtooOptions = {}) {
     this.apiKey = options.apiKey || "";
     this.baseUrl = options.baseUrl || "https://api.vengtoo.com";
     this.timeout = options.timeout || 10000;
@@ -153,7 +153,7 @@ export class AuthzX {
     if (hasOAuth) {
       if (!options.clientId || !options.clientSecret) {
         throw new Error(
-          "AuthzX: both clientId and clientSecret are required for OAuth"
+          "Vengtoo: both clientId and clientSecret are required for OAuth"
         );
       }
       this.oauth = {
@@ -165,7 +165,7 @@ export class AuthzX {
 
     if (this.apiKey && this.oauth) {
       throw new Error(
-        "AuthzX: configure either apiKey or OAuth client credentials, not both"
+        "Vengtoo: configure either apiKey or OAuth client credentials, not both"
       );
     }
   }
@@ -181,7 +181,7 @@ export class AuthzX {
   /** Fetches (or returns cached) OAuth access token. Thread-safe via promise guard. */
   private async getAccessToken(): Promise<string> {
     if (!this.oauth) {
-      throw new Error("AuthzX: OAuth not configured");
+      throw new Error("Vengtoo: OAuth not configured");
     }
     const now = Date.now();
     if (this.cachedToken && now < this.cachedToken.expiresAt - REFRESH_SKEW_MS) {
@@ -232,14 +232,14 @@ export class AuthzX {
       try {
         payload = JSON.parse(text);
       } catch {
-        throw new AuthzXOAuthError(
+        throw new VengtooOAuthError(
           response.status,
           "invalid_response",
           "token endpoint returned non-JSON body"
         );
       }
       if (!payload.access_token) {
-        throw new AuthzXOAuthError(
+        throw new VengtooOAuthError(
           response.status,
           "invalid_response",
           "token endpoint returned empty access_token"
@@ -269,7 +269,7 @@ export class AuthzX {
     if (response.status === 401 && errCode === "token_endpoint_error") {
       errCode = "invalid_client";
     }
-    throw new AuthzXOAuthError(response.status, errCode, errDescription);
+    throw new VengtooOAuthError(response.status, errCode, errDescription);
   }
 
   private invalidateToken(): void {
@@ -329,7 +329,7 @@ export class AuthzX {
           continue;
         }
 
-        const err = new AuthzXError(response.status, body);
+        const err = new VengtooError(response.status, body);
 
         // Only retry on 5xx or 429
         if (response.status >= 500 || response.status === 429) {
@@ -339,8 +339,8 @@ export class AuthzX {
 
         throw err;
       } catch (err) {
-        if (err instanceof AuthzXError) throw err;
-        if (err instanceof AuthzXOAuthError) throw err;
+        if (err instanceof VengtooError) throw err;
+        if (err instanceof VengtooOAuthError) throw err;
         lastError = err as Error;
       } finally {
         clearTimeout(timeoutId);
@@ -362,10 +362,10 @@ export class AuthzX {
 
   async authorizeBatch(req: BatchEvaluationRequest): Promise<BatchEvaluationResponse> {
     if (!req.evaluations || req.evaluations.length === 0) {
-      throw new Error("authzx: batch request requires at least one evaluation");
+      throw new Error("vengtoo: batch request requires at least one evaluation");
     }
     if (req.evaluations.length > 50) {
-      throw new Error("authzx: batch request exceeds maximum of 50 evaluations");
+      throw new Error("vengtoo: batch request exceeds maximum of 50 evaluations");
     }
 
     let oauthRetried = false;
@@ -406,15 +406,15 @@ export class AuthzX {
           continue;
         }
 
-        const err = new AuthzXError(response.status, body);
+        const err = new VengtooError(response.status, body);
         if (response.status >= 500 || response.status === 429) {
           lastError = err;
           continue;
         }
         throw err;
       } catch (err) {
-        if (err instanceof AuthzXError) throw err;
-        if (err instanceof AuthzXOAuthError) throw err;
+        if (err instanceof VengtooError) throw err;
+        if (err instanceof VengtooOAuthError) throw err;
         lastError = err as Error;
       } finally {
         clearTimeout(timeoutId);
@@ -431,7 +431,7 @@ export class AuthzX {
 
   /**
    * Express middleware factory.
-   * Usage: app.get('/docs/:id', authzx.middleware('document', 'read'), handler)
+   * Usage: app.get('/docs/:id', vengtoo.middleware('document', 'read'), handler)
    */
   middleware(
     resourceType: string,
@@ -466,4 +466,4 @@ export class AuthzX {
   }
 }
 
-export default AuthzX;
+export default Vengtoo;
