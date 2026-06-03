@@ -1,7 +1,7 @@
 {
-  "name": "@authzx/sdk",
-  "version": "1.0.1",
-  "description": "AuthzX Node.js SDK — authorization client for AuthzX Cloud and the AuthzX Agent",
+  "name": "@vengtoo/sdk",
+  "version": "1.0.0",
+  "description": "Vengtoo Node.js SDK — authorization client for Vengtoo Cloud and the Vengtoo Agent",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -15,21 +15,21 @@
   },
   "keywords": [
     "authorization",
-    "authzx",
+    "vengtoo",
     "rbac",
     "abac",
     "access-control",
     "ai-agents"
   ],
-  "author": "AuthzX <hello@authzx.com>",
+  "author": "AuthzX <hello@vengtoo.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/authzx/authzx-node.git"
+    "url": "git+https://github.com/authzx/vengtoo-node.git"
   },
-  "homepage": "https://authzx.com",
+  "homepage": "https://vengtoo.com",
   "bugs": {
-    "url": "https://github.com/authzx/authzx-node/issues"
+    "url": "https://github.com/vengtoo/vengtoo-node/issues"
   },
   "engines": {
     "node": ">=18"

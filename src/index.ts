@@ -120,7 +120,7 @@ export class AuthzXOAuthError extends Error {
 }
 
 const DEFAULT_TOKEN_URL =
-  "https://api.authzx.com/v1/oauth/token";
+  "https://api.vengtoo.com/v1/oauth/token";
 const REFRESH_SKEW_MS = 60_000;
 
 interface CachedToken {
@@ -145,7 +145,7 @@ export class AuthzX {
 
   constructor(options: AuthzXOptions = {}) {
     this.apiKey = options.apiKey || "";
-    this.baseUrl = options.baseUrl || "https://api.authzx.com";
+    this.baseUrl = options.baseUrl || "https://api.vengtoo.com";
     this.timeout = options.timeout || 10000;
     this.maxRetries = options.maxRetries ?? 2;
 
